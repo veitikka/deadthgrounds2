@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "hxml",
+      "file": "build.hxml",
+      "problemMatcher": [
+        "$haxe-absolute",
+        "$haxe",
+        "$haxe-error",
+        "$haxe-trace"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "label": "gmodhaxe: build server + client"
+    },
+    {
+      "type": "hxml",
+      "file": "server.hxml",
+      "problemMatcher": [
+        "$haxe-absolute",
+        "$haxe",
+        "$haxe-error",
+        "$haxe-trace"
+      ],
+      "group": "build",
+      "label": "gmodhaxe: build server"
+    },
+    {
+      "type": "hxml",
+      "file": "client.hxml",
+      "problemMatcher": [
+        "$haxe-absolute",
+        "$haxe",
+        "$haxe-error",
+        "$haxe-trace"
+      ],
+      "group": "build",
+      "label": "gmodhaxe: build client"
+    },
+    {
+      "type": "shell",
+      "command": "./scripts/script.sh",
+      "windows": {
+        "command": "set PATH=C:\\cygwin64\\bin;%PATH% && C:\\cygwin64\\bin\\bash scripts/script.sh"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/assets"
+      },
+      "group": "build",
+      "label": "compile assets"
+    },
+    {
+      "type": "shell",
+      "command": "haxelib run formatter -s src",
+      "group": "none",
+      "label": "format"
+    }
+  ]
+}
