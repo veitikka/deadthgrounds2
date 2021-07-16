@@ -1,5 +1,6 @@
 package mdg;
 
+import gmod.helpers.net.NET_Server;
 import gmod.libs.DrawLib;
 import gmod.libs.SurfaceLib;
 import gmod.libs.UtilLib;
@@ -13,10 +14,21 @@ import gmod.gclass.Vector;
 
 using mdg.extensions.PlayerExtensions;
 
+typedef RoundSituation = {
+    finalePos: Null<Vector>,
+    winner: Null<Entity>
+}
+
 class MdgLobby extends MdgState {
     #if server
     var spawns:SpawnManager = null;
     #end
+
+    final roundNet = new NET_Server<"mdg.net.roundsituation", RoundSituation>();
+    var roundSituation:RoundSituation = {
+        finalePos: null,
+        winner: null
+    }
 
     final minPlayers = 2;
     final lobbyTime = 5;
@@ -24,6 +36,11 @@ class MdgLobby extends MdgState {
 
     public function new(manager:GameHooks) {
         super(manager);
+        #if client
+        roundNet.addReceiver("mdg.net.roundsituation.client", (data) -> {
+            roundSituation = data;
+        });
+        #end
     }
 
     override function create() {

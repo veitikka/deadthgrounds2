@@ -1,5 +1,9 @@
 package mdg;
 
+import gmod.gclass.Color;
+import gmod.libs.DrawLib;
+import gmod.libs.SurfaceLib;
+import gmod.libs.CamLib;
 import gmod.libs.TimerLib;
 import gmod.libs.EntsLib;
 import gmod.Gmod;
@@ -15,6 +19,7 @@ import gmod.gclass.Vector;
 using mdg.extensions.PlayerExtensions;
 
 class MdgBattle extends MdgState {
+    var finalePos = null;
     #if server
     var gameSpawns:SpawnManager = null;
     var spectatorSpawns:SpawnManager = null;
@@ -53,6 +58,7 @@ class MdgBattle extends MdgState {
 
         #if server
         spawnMissionEntities();
+        getFinalePoint();
         #end
     }
 
@@ -85,6 +91,11 @@ class MdgBattle extends MdgState {
         // TODO: Make most entities sleep ~5 seconds after spawning
     }
 
+    function getFinalePoint(): Vector {
+        final finale = Random.fromArray(manager.mission.finales);
+        return new Vector(finale.pos[0], finale.pos[1], finale.pos[2]);
+    }
+
     function createDrone(player:Player) {
         final ent:Entity = EntsLib.Create("prop_physics");
         ent.SetModel("models/hunter/misc/sphere025x025.mdl");
@@ -105,8 +116,16 @@ class MdgBattle extends MdgState {
     // Hooks
 
     #if client
-    override function hudDrawTargetId() {
-
+    override function hudPaintBackground() {
+        if (finalePos != null) {
+            final playerPos = Gmod.LocalPlayer().GetPos();
+            final dist = Math.round(finalePos.Distance(playerPos) * 0.0190625);
+            final text = 'Finale - ${dist}m';
+            final textPos = finalePos.ToScreen();
+            SurfaceLib.SetFont("Default");
+            final width = SurfaceLib.GetTextSize(text).a;
+            DrawLib.SimpleText(text, "Default", (-width / 2) + textPos.x, textPos.y, Gmod.Color(255, 255, 255));
+        }
     }
     #end
 

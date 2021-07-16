@@ -38,6 +38,8 @@ class MdgState {
     public function hudDrawTargetId() {
 
     }
+
+    public function hudPaintBackground() {}
     #end
 
     #if server

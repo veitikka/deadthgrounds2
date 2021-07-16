@@ -10,8 +10,4 @@ class Base_GmodEntity extends SentBuild<ENT_ANIM> {
         Spawnable: false
         
     }
-
-    override function Initialize() {
-
-    }
 }

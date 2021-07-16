@@ -120,6 +120,10 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
         gameState.hudDrawTargetId();
     }
 
+    override function HUDPaintBackground() {
+        gameState.hudPaintBackground();
+    }
+
     @:gmodHook(GMHook.InitPostEntity)
     static function initPost() {
         NetLib.Start("mdg.net.clientinit");
