@@ -124,6 +124,10 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
         gameState.hudPaintBackground();
     }
 
+    override function PostDrawOpaqueRenderables(bDrawingDepth:Bool, bDrawingSkybox:Bool) {
+        gameState.postDrawOpaqueRenderables(bDrawingDepth, bDrawingSkybox);   
+    }
+
     @:gmodHook(GMHook.InitPostEntity)
     static function initPost() {
         NetLib.Start("mdg.net.clientinit");

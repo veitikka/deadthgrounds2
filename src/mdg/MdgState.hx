@@ -40,6 +40,8 @@ class MdgState {
     }
 
     public function hudPaintBackground() {}
+
+    public function postDrawOpaqueRenderables(bDrawingDepth:Bool, bDrawingSkybox:Bool) {}
     #end
 
     #if server

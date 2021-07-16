@@ -1,5 +1,8 @@
 package mdg;
 
+import gmod.gclass.IMaterial;
+import gmod.libs.RenderLib;
+import gmod.helpers.net.NET_Server;
 import gmod.gclass.Color;
 import gmod.libs.DrawLib;
 import gmod.libs.SurfaceLib;
@@ -18,22 +21,47 @@ import gmod.gclass.Vector;
 
 using mdg.extensions.PlayerExtensions;
 
+typedef RoundSituation = {
+    finalePos: Null<Vector>,
+    winner: Null<Entity>
+}
+
 class MdgBattle extends MdgState {
-    var finalePos = null;
     #if server
     var gameSpawns:SpawnManager = null;
     var spectatorSpawns:SpawnManager = null;
+    var s = Console.getVarInt("", 1);
     #end
+
+    #if client
+    var sphereMaterial:IMaterial = null;
+    #end
+
+    final roundNet = new NET_Server<"mdg_net_roundsituation", RoundSituation>();
+    var roundSituation:RoundSituation = {
+        finalePos: null,
+        winner: null
+    }
 
     final postRoundTime = 7;
     final droneRespawnTime = 30;
 
     public function new(manager:GameHooks) {
         super(manager);
+        #if client
+        roundNet.addReceiver("mdg.net.roundsituation.client", (data) -> {
+            roundSituation = data;
+        });
+        #end
     }
 
     override function create() {
         // TODO: Replace with some sort of lazy eval
+        #if client
+        if (sphereMaterial == null) {
+            sphereMaterial = Gmod.Material("").a;
+        }
+        #end
         #if server
         if (gameSpawns == null) {
             gameSpawns = new SpawnManager(manager.mission.gamespawns.map(p -> new Vector(p.pos[0], p.pos[1], p.pos[2])), manager.playerHull);
@@ -117,6 +145,7 @@ class MdgBattle extends MdgState {
 
     #if client
     override function hudPaintBackground() {
+        final finalePos = roundSituation.finalePos;
         if (finalePos != null) {
             final playerPos = Gmod.LocalPlayer().GetPos();
             final dist = Math.round(finalePos.Distance(playerPos) * 0.0190625);
@@ -125,6 +154,15 @@ class MdgBattle extends MdgState {
             SurfaceLib.SetFont("Default");
             final width = SurfaceLib.GetTextSize(text).a;
             DrawLib.SimpleText(text, "Default", (-width / 2) + textPos.x, textPos.y, Gmod.Color(255, 255, 255));
+        }
+    }
+
+    override function postDrawOpaqueRenderables(bDrawingDepth:Bool, bDrawingSkybox:Bool) {
+        final finalePos = roundSituation.finalePos;
+        if (finalePos != null) {
+            // RenderLib.SetMaterial(sphereMaterial);
+            RenderLib.SetColorMaterial();
+            RenderLib.DrawSphere(finalePos, 1024, 8, 8, Gmod.Color(255, 255, 255, 127));
         }
     }
     #end
