@@ -56,6 +56,7 @@ class MdgLobby extends MdgState {
             var iterations = 0;
             TimerLib.Create("fwuso.mdg.lobby.countdown", 1, lobbyTime+1, function() {
                 if (PlayerLib.GetCount() < minPlayers) {
+                    manager.notifyAll('Not enough players to start the game.', 3);
                     lobbyCountDown = false;
                     TimerLib.Remove("fwuso.mdg.lobby.countdown");
                     return;
@@ -70,6 +71,8 @@ class MdgLobby extends MdgState {
                 manager.notifyAll('The game will start in ${secs} second${if (secs == 1) "" else "s"}.');
                 iterations++;
             });
+        } else if (!lobbyCountDown) {
+            manager.notifyAll('Not enough players to start the game.', 3, 15);
         }
     }
     #end

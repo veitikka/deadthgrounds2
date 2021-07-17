@@ -1,14 +1,13 @@
 package mdg.extensions;
 
+import mdg.panels.ScoreBoardPlayer;
 import gmod.gclass.Player;
 import gmod.gclass.Vector;
 import Math;
 import Std;
 
 class PlayerExtensions {
-    #if server
     static final dataMap = new Map<Player, PlayerData>();
-    #end
 
     #if server
     public static function init(player:Player, position:Vector) {
@@ -45,20 +44,38 @@ class PlayerExtensions {
         player.SetArmor(0);
     }
 
+    public static function addWins(player:Player, num:Int) {
+
+    }
+
+    #end
+    public static function getWins(player:Player):Int {
+        return 0;
+    }
+
     public static function playerData(player:Player): PlayerData {
         final data = dataMap.get(player);
         if (data != null) {
             return data;
         }
         final newData = {
-            nextSpawnTime: 0.0
+            #if server
+            nextSpawnTime: 0.0,
+            #end
+            #if client
+            scoreBoardEntry: null,
+            #end
         };
         dataMap.set(player, newData);
         return newData;
     }
-    #end
 }
 
 typedef PlayerData = {
-    nextSpawnTime: Float
+    #if server
+    nextSpawnTime: Float,
+    #end
+    #if client
+    scoreBoardEntry: Null<ScoreBoardPlayer>,
+    #end
 }

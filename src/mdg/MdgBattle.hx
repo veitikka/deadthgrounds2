@@ -1,5 +1,9 @@
 package mdg;
 
+import gmod.libs.MathLib;
+import mdg.Utils.spawnSimfphys;
+import gmod.helpers.TableTools;
+import gmod.libs.EngineLib;
 import gmod.gclass.IMaterial;
 import gmod.libs.RenderLib;
 import gmod.helpers.net.NET_Server;
@@ -22,20 +26,47 @@ import gmod.gclass.Vector;
 using mdg.extensions.PlayerExtensions;
 
 typedef RoundSituation = {
-    finalePos: Null<Vector>,
-    winner: Null<Entity>
+    finalePos: Vector,
+    winner: Entity
 }
 
 class MdgBattle extends MdgState {
+    #if client
+    var sphereMaterial:IMaterial = Gmod.Material("mdg/sphere.vmt").a;
+    final colorModify = Table.fromMap([
+        "$pp_colour_addr" => Theme.rgbPercentage(Theme.sphereColor.r) * 0.35,
+        "$pp_colour_addg" => Theme.rgbPercentage(Theme.sphereColor.g) * 0.35,
+        "$pp_colour_addb" => Theme.rgbPercentage(Theme.sphereColor.b) * 0.35,
+        "$pp_colour_brightness" => -0.05,
+        "$pp_colour_contrast" => 1,
+        "$pp_colour_colour" => 1,
+        "$pp_colour_mulr" => Theme.rgbPercentage(Theme.sphereColor.r),
+        "$pp_colour_mulg" => Theme.rgbPercentage(Theme.sphereColor.g),
+        "$pp_colour_mulb" => Theme.rgbPercentage(Theme.sphereColor.b)
+    ]);
+    #end
+
     #if server
     var gameSpawns:SpawnManager = null;
     var spectatorSpawns:SpawnManager = null;
-    var s = Console.getVarInt("", 1);
     #end
 
-    #if client
-    var sphereMaterial:IMaterial = null;
-    #end
+    final originalSphereRadius = 65536.0;
+    var sphereRadius(get, set):Float;
+    function get_sphereRadius():Float {
+		return Gmod.GetGlobalFloat("mdg.globals.sphereradius", 0.0);
+	}
+
+	function set_sphereRadius(value:Float):Float {
+        #if client
+        Gmod.LocalPlayer().ChatPrint("NETWORK VAR SET ON CLIENT; DON'T DO THIS");
+        return 0.0;
+        #end
+        #if server
+        Gmod.SetGlobalFloat("mdg.globals.sphereradius", value);
+        return value;
+        #end
+	}
 
     final roundNet = new NET_Server<"mdg_net_roundsituation", RoundSituation>();
     var roundSituation:RoundSituation = {
@@ -43,6 +74,8 @@ class MdgBattle extends MdgState {
         winner: null
     }
 
+    var tickInterval = EngineLib.TickInterval();
+    final shrinkRate = 45.0;
     final postRoundTime = 7;
     final droneRespawnTime = 30;
 
@@ -56,12 +89,8 @@ class MdgBattle extends MdgState {
     }
 
     override function create() {
+        tickInterval = EngineLib.TickInterval();
         // TODO: Replace with some sort of lazy eval
-        #if client
-        if (sphereMaterial == null) {
-            sphereMaterial = Gmod.Material("").a;
-        }
-        #end
         #if server
         if (gameSpawns == null) {
             gameSpawns = new SpawnManager(manager.mission.gamespawns.map(p -> new Vector(p.pos[0], p.pos[1], p.pos[2])), manager.playerHull);
@@ -69,9 +98,7 @@ class MdgBattle extends MdgState {
         if (spectatorSpawns == null) {
             spectatorSpawns = new SpawnManager(manager.mission.dronespawns.map(p -> new Vector(p.pos[0], p.pos[1], p.pos[2])), manager.droneHull);
         }
-        #end
         for (player in PlayerLib.GetAll()) {
-            #if server
             if (player.Alive()) {
                 player.restore();
             } else {
@@ -79,23 +106,46 @@ class MdgBattle extends MdgState {
             }
             player.SetTeam(1);
             player.SetPos(gameSpawns.next());
-            player.Give("weapon_357");
-            player.Give("weapon_slam");
-            #end
         }
-
-        #if server
         spawnMissionEntities();
-        getFinalePoint();
+        final fpoint = getFinalePoint();
+        sphereRadius = originalSphereRadius;
+        roundSituation = { finalePos: fpoint, winner: null }
+        roundNet.broadcast(roundSituation);
+
+        final sphereDamage = Gmod.DamageInfo();
+        sphereDamage.SetDamage(5);
+        sphereDamage.SetDamageType(DMG_DISSOLVE);
+        sphereDamage.SetReportedPosition(fpoint);
+        TimerLib.Create("fwuso.mdg.timer.spheredamage", 3, 0, () -> {
+            final finalePos = roundSituation.finalePos;
+            final array:Array<Player> = Table.toArray(cast TeamLib.GetPlayers(manager.TEAM_PLAYERS));
+            for (player in array) {
+                final dist = player.GetPos().Distance(finalePos);
+                if (dist > sphereRadius) {
+                    // player.TakeDamageInfo(sphereDamage);
+                }
+            }
+        });
+        manager.notifyAll("Good Huntign,,,", 5);
         #end
     }
 
-    override function think() {
-
+    override function tick() {
+        #if server
+        if (sphereRadius > 64) {
+            final speedMultiplier = (Math.sin(((3.14 / originalSphereRadius) * sphereRadius) + 1.57) * -1) + 1;
+            // trace(speedMultiplier);
+            sphereRadius -= shrinkRate * tickInterval * speedMultiplier;
+        }
+        #end
     }
 
     override function destroy() {
         #if server
+        roundSituation = { finalePos: null, winner: null }
+        // roundNet.broadcast(roundSituation);
+        TimerLib.Remove("fwuso.mdg.timer.spheredamage");
         TimerLib.Remove("fwuso.mdg.timer.postround");
         #end
         GameLib.CleanUpMap(null, Table.fromArray(["env_fire", "entityflame", "_firesmoke"]));
@@ -104,14 +154,21 @@ class MdgBattle extends MdgState {
     #if server
     function checkBattleDeath(killed:Player) {
         final aliveCount = TeamLib.NumPlayers(manager.TEAM_PLAYERS);
+        final players:Array<Player> = Table.toArray(cast TeamLib.GetPlayers(manager.TEAM_PLAYERS));
+        manager.notifyAll('${killed.Nick()} died!', 2);
         trace('alive: ${aliveCount}');
         if (aliveCount == 1) {
-            final table:Table<Int, Player> = cast TeamLib.GetPlayers(manager.TEAM_PLAYERS);
-            final winner = Table.toArray(table)[0];
-            manager.notifyAll('${winner.Nick()} Wins!');
+            final winner = players[0];
+            manager.announceWinner(winner);
             TimerLib.Create("fwuso.mdg.timer.postround", postRoundTime, 1, function() {
                 startState(manager.lobby);
             });
+        } else if (aliveCount == 2) {
+            final candidate1 = players[0].Nick();
+            final candidate2 = players[1].Nick();
+            manager.notifyAll('${candidate1} vs ${candidate2}', 2);
+        } else {
+            manager.notifyAll('${aliveCount} combatants remaining');
         }
     }
 
@@ -148,21 +205,50 @@ class MdgBattle extends MdgState {
         final finalePos = roundSituation.finalePos;
         if (finalePos != null) {
             final playerPos = Gmod.LocalPlayer().GetPos();
-            final dist = Math.round(finalePos.Distance(playerPos) * 0.0190625);
-            final text = 'Finale - ${dist}m';
+            final dist = finalePos.Distance(playerPos);
+            final text = 'Finale - ${Math.round(dist * 0.0190625)}m';
             final textPos = finalePos.ToScreen();
             SurfaceLib.SetFont("Default");
             final width = SurfaceLib.GetTextSize(text).a;
-            DrawLib.SimpleText(text, "Default", (-width / 2) + textPos.x, textPos.y, Gmod.Color(255, 255, 255));
+            DrawLib.SimpleTextOutlined(text, "Default", (-width / 2) + textPos.x, textPos.y, Gmod.Color(255, 255, 255), null, null, 2,
+            Theme.textShadow);
         }
     }
 
     override function postDrawOpaqueRenderables(bDrawingDepth:Bool, bDrawingSkybox:Bool) {
+        if (bDrawingSkybox) {
+            return;
+        }
         final finalePos = roundSituation.finalePos;
+        final dist = finalePos.Distance(Gmod.LocalPlayer().GetPos());
+        final diff = sphereRadius - dist;
+        final alphaMultiplier = 1-MathLib.Remap(MathLib.Clamp(diff, 1024, 1536), 1024, 1536, 0, 1);
+        final alpha = Gmod.Lerp(alphaMultiplier, 0, 127);
+        final red = Theme.sphereColor.r;
+        final green = Theme.sphereColor.g;
+        final blue = Theme.sphereColor.b;
         if (finalePos != null) {
-            // RenderLib.SetMaterial(sphereMaterial);
-            RenderLib.SetColorMaterial();
-            RenderLib.DrawSphere(finalePos, 1024, 8, 8, Gmod.Color(255, 255, 255, 127));
+            RenderLib.SetMaterial(sphereMaterial);
+            RenderLib.DrawSphere(finalePos, sphereRadius, 32, 32, Gmod.Color(red, green, blue, alpha));
+        }
+    }
+
+    override function renderScreenspaceEffects() {
+        final finalePos = roundSituation.finalePos;
+        // TODO: Remove the hack
+        final player = Gmod.LocalPlayer();
+        var huutis = false;
+        final a:Array<Player> = Table.toArray(cast TeamLib.GetPlayers(manager.TEAM_PLAYERS));
+        for (i in a) {
+            if (i.UserID() == player.UserID()) {
+                huutis = true;
+            }
+        }
+        if (finalePos != null && huutis) {
+            final dist = finalePos.Distance(player.GetPos());
+            if (dist > sphereRadius) {
+                Gmod.DrawColorModify(colorModify);
+            }
         }
     }
     #end

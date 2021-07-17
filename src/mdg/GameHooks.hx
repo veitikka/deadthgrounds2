@@ -1,5 +1,7 @@
 package mdg;
 
+import mdg.panels.ScoreBoard;
+import gmod.libs.VguiLib;
 import gmod.stringtypes.Hook.GMHook;
 import mdg.structs.Mission;
 import gmod.libs.GameLib;
@@ -22,7 +24,27 @@ using mdg.extensions.PlayerExtensions;
 // mdg_postroundtime -- Amount of time to wait at the end of the match
 // mdg_drone_respawntime -- Amount of time it takes for drone players to respawn
 class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
+    /*
+    final _states = [];
+    var gameState(get, set):MdgState;
+    function get_gameState():MdgState {
+		return _states[Gmod.GetGlobalInt("mdg.globals.gamestate")];
+	}
+
+	function set_gameState(value:MdgState):MdgState {
+        #if client
+        Gmod.LocalPlayer().ChatPrint("NETWORK VAR SET ON CLIENT; DON'T DO THIS");
+        return null;
+        #end
+        #if server
+        Gmod.SetGlobalInt("mdg.globals.gamestate", _states.indexOf(value));
+        return value;
+        #end
+	}
+    */
     var gameState:MdgState = null;
+
+    final notifier = new Notifier();
 
     public var defaultState:MdgDefaultState = null;
     public var lobby:MdgLobby = null;
@@ -42,6 +64,10 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
         mins: new Vector(-17, -17, -1),
         maxs: new Vector(17, 17, 73)
     };
+
+    #if client
+    final scoreBoard = ScoreBoard.getInstance();
+    #end
 
     public function setUp() {
         defaultState = new MdgDefaultState(this);
@@ -82,7 +108,7 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
 
     override function Initialize() {
         gameState = defaultState;
-        gameState.create();
+        getGameState().create();
 
         #if server
         final missionManager = new MissionManager("deadthgrounds2/missions/", print);
@@ -103,29 +129,46 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
         }
 
         if (mission != null) {
-            gameState.startState(lobby);
+            getGameState().startState(lobby);
         } else {
-            final castedState:MdgDefaultState = cast gameState;
-            castedState.errorMessage = "This map is not compatible with the gamemode. Please select another map. See console for details.";
+            final castedState:MdgDefaultState = cast getGameState();
+            castedState.errorMessage = "Incompatible map. See console for details. Please select another map.";
         }
         #end
     }
 
     override function Think() {
-        gameState.think();
+        getGameState().think();
+    }
+
+    override function Tick() {
+        getGameState().tick();
     }
 
     #if client
     override function HUDDrawTargetID() {
-        gameState.hudDrawTargetId();
+        getGameState().hudDrawTargetId();
     }
 
     override function HUDPaintBackground() {
-        gameState.hudPaintBackground();
+        getGameState().hudPaintBackground();
     }
 
     override function PostDrawOpaqueRenderables(bDrawingDepth:Bool, bDrawingSkybox:Bool) {
-        gameState.postDrawOpaqueRenderables(bDrawingDepth, bDrawingSkybox);   
+        getGameState().postDrawOpaqueRenderables(bDrawingDepth, bDrawingSkybox);   
+    }
+
+    override function RenderScreenspaceEffects() {
+        getGameState().renderScreenspaceEffects();
+    }
+
+    override function ScoreboardShow() {
+        scoreBoard.Show();
+        scoreBoard.MakePopup();
+    }
+
+    override function ScoreboardHide() {
+        scoreBoard.Hide();
     }
 
     @:gmodHook(GMHook.InitPostEntity)
@@ -137,7 +180,7 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
 
     #if server
     override function PlayerSpawn(player:Player, transition:Bool) {
-        gameState.playerSpawn(player, transition);
+        getGameState().playerSpawn(player, transition);
     }
 
     override function DoPlayerDeath(player:Player, attacker:Entity, damageInfo:CTakeDamageInfo) {
@@ -146,19 +189,19 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
             // EntsLib.CreateClientProp("");
         }
         player.CreateRagdoll();
-        gameState.doPlayerDeath(player, attacker, damageInfo);
+        getGameState().doPlayerDeath(player, attacker, damageInfo);
     }
 
     override function PlayerDeath(player:Player, inflictor:Entity, attacker:Entity) {
-        gameState.playerDeath(player, inflictor, attacker);
+        getGameState().playerDeath(player, inflictor, attacker);
     }
 
     override function PlayerDeathThink(player:Player):Bool {
-        return gameState.playerDeathThink(player);
+        return getGameState().playerDeathThink(player);
     }
 
     override function PlayerDisconnected(player:Player) {
-        gameState.playerDisconnected(player);
+        getGameState().playerDisconnected(player);
     }
 
     // Disable HEV beeping
@@ -167,7 +210,7 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
     }
 
     override function CanPlayerSuicide(player:Player):Bool {
-        return gameState.canPlayerSuicide(player);
+        return getGameState().canPlayerSuicide(player);
     }
 
     override function GetFallDamage(player:Player, speed:Float):Float {
@@ -179,11 +222,15 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
         final value = stateToInt(gameState);
         NetLib.WriteUInt(value, 2);
         NetLib.Send(player);
-        gameState.playerJoined(player);
+        getGameState().playerJoined(player);
     }
 
-    public function notifyAll(message:String) {
-        Gmod.PrintMessage(HUD_PRINTTALK, message);
+    public function notifyAll(message:String, ?minDisplayTime: Null<Float>, ?maxDisplayTime: Null<Float>) {
+        notifier.notifyAll(message, minDisplayTime, maxDisplayTime);
+    }
+
+    public function announceWinner(player:Player) {
+        notifier.announceWinner(player);
     }
 
     public function print(message:String) {
@@ -191,6 +238,7 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
     }
 
     public function setGameState(state:MdgState) {
+        notifier.reset();
         gameState = state;
         NetLib.Start("mdg.net.changestate");
         final value = stateToInt(state);
@@ -198,6 +246,10 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
         NetLib.Broadcast();
     }
     #end
+
+    public inline function getGameState() {
+        return gameState;
+    }
 
     function stateToInt(state:MdgState):Int {
         return switch state {

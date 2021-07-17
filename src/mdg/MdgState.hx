@@ -19,6 +19,8 @@ class MdgState {
 
     }
 
+    public function tick() {}
+
     public function destroy() {
 
     }
@@ -42,6 +44,8 @@ class MdgState {
     public function hudPaintBackground() {}
 
     public function postDrawOpaqueRenderables(bDrawingDepth:Bool, bDrawingSkybox:Bool) {}
+
+    public function renderScreenspaceEffects() {}
     #end
 
     #if server

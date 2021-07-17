@@ -42,9 +42,9 @@
     },
     {
       "type": "shell",
-      "command": "./scripts/script.sh",
+      "command": "./scripts/assets_copy.sh",
       "windows": {
-        "command": "set PATH=C:\\cygwin64\\bin;%PATH% && C:\\cygwin64\\bin\\bash scripts/script.sh"
+        "command": "set PATH=C:\\cygwin64\\bin;%PATH% && C:\\cygwin64\\bin\\bash ./scripts/assets_copy.sh"
       },
       "options": {
         "cwd": "${workspaceFolder}/assets"
