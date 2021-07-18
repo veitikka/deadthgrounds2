@@ -66,7 +66,7 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
     };
 
     #if client
-    final scoreBoard = ScoreBoard.getInstance();
+    var scoreBoard:GScoreBoard = null;
     #end
 
     public function setUp() {
@@ -104,6 +104,12 @@ class GameHooks extends gmod.helpers.gamemode.GMBuild<gmod.gamemode.GM> {
     override function CreateTeams() {
         TeamLib.SetUp(TEAM_PLAYERS, "Players", Gmod.Color(255, 255, 0));
         TeamLib.SetUp(TEAM_SPECTATORS, "Spectators", Gmod.Color(160, 160, 200));
+    }
+
+    override function OnGamemodeLoaded() {
+        #if client
+        scoreBoard = ScoreBoard.getInstance();
+        #end
     }
 
     override function Initialize() {
